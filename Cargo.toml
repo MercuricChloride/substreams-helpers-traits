@@ -1,0 +1,11 @@
+[package]
+name = "substreams-helpers-traits"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+derive_more = "0.99.17"
+substreams = "0.5.10"
+substreams-ethereum = { path = "../../substreams-ethereum/substreams-ethereum" }
