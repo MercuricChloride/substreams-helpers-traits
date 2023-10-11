@@ -5,63 +5,45 @@ pub fn format_hex(hex: &[u8]) -> String {
     format!("0x{}", Hex(hex).to_string())
 }
 
-/// A trait that allows us to extract a type from an ethereum block.
-/// In most cases, this will be an event.
-///
-/// This won't be used directly most of the time, instead it will be used
-/// the macro helpers I am writing.
-pub trait FromBlock: Sized + Event {
-    /// Attempts to extract this type from an ethereum block.
-    /// You can optionally pass in an address to filter the logs by.
-    /// Just note that this string expects a 0x prefixed address.
+// example
+// impl FromB for SubmitBid
+// which goes from a block -> Vec<Events>
+// Which is Into<SubmitBid>
+pub trait FromBlock: Sized + FromBlockAndAddress {
     fn from_block(
         block: substreams_ethereum::pb::eth::v2::Block,
-        address: Option<&str>,
+        address: Option<String>,
     ) -> Vec<Self>
     where
-        Self: Sized + substreams_ethereum::Event,
+        Self: Sized + FromBlockAndAddress,
     {
-        block
-            .logs()
-            .filter(|log| {
-                if let Some(address) = address {
-                    log.address() == Hex::decode(address).expect("Failed to decode address")
-                } else {
-                    true
-                }
-            })
-            .filter_map(|log| Self::match_and_decode(log))
-            .collect::<Vec<Self>>()
+        Self::from_block_and_address(block, address)
     }
 }
 
-/// A trait that allows us to convert an event into another type. This again
-/// will be used by the macro helpers I am writing.
-pub trait FromEvent<T: substreams_ethereum::Event>: Sized {
-    /// Attempts to create this type from an event.
-    /// Returning `None` if the event does not contain this type.
-    fn from_event(event: T) -> Option<Self>
-    where
-        Self: Sized;
+pub trait FromBlockAndAddress: Sized {
+    fn from_block_and_address(
+        block: substreams_ethereum::pb::eth::v2::Block,
+        address: Option<String>,
+    ) -> Vec<Self>;
 }
 
 // This Trait describes mapping from one protobuf to another
-pub trait Map<E: FromBlock + substreams_ethereum::Event, P: From<E>>: Sized + From<Vec<P>> {
+pub trait Map<I: FromBlock + Into<P>, P>: Sized + From<Vec<P>> {
     fn map(
         block: substreams_ethereum::pb::eth::v2::Block,
-        address: Option<&str>,
+        address: Option<String>,
     ) -> Result<Self, substreams::errors::Error>
     where
         Self: Sized,
     {
-        let events = E::from_block(block, address);
-        let proto = events
+        let events = I::from_block_and_address(block, address);
+        let protos = events
             .into_iter()
-            .map(|event| P::from(event))
+            .map(|event| event.into())
             .collect::<Vec<_>>();
 
-        let proto = proto.into();
-        Ok(proto)
+        Ok(protos.into())
     }
 }
 
